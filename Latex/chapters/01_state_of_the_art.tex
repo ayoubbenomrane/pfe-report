@@ -1,0 +1,140 @@
+\chapter{State of the Art}
+
+\section{Introduction}
+
+A Ticket Management System is at its core a collaboration tool: it lets teams track work items, link them to higher-level goals, and know at a glance who is doing what and where things stand. For a technical company like Canny Vision, which builds computer vision products involving sensitive surveillance data, such a system is not optional—it is how the team coordinates internally on every project.
+
+The question is not whether to use one, but which one. This chapter surveys the existing solutions, examines the access control standards that govern how such systems enforce permissions, and reviews the technology choices made for the backend and the frontend—leading to the justification of the stack selected for this project.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Existing Ticket Management Solutions}
+
+\subsection{Commercial SaaS Products}
+
+The dominant players in the space—Jira, ClickUp, Asana, and Linear—are all Software-as-a-Service platforms. They store data on the vendor's infrastructure, which by design means the company has no control over where that data physically lives.
+
+\textbf{Jira} (Atlassian) is the de facto standard in software teams. It offers a rich feature set: sprints, epics, custom workflows, automations, and deep integrations with CI/CD pipelines. Its complexity is well-documented; configuring a project correctly requires a non-trivial amount of administrator time, and the free tier imposes strict limits on users and storage.
+
+\textbf{ClickUp} markets itself as an all-in-one replacement for every productivity tool. It covers task boards, docs, goals, time tracking, and dashboards. The breadth of features is impressive but introduces cognitive overhead for teams that only need the ticket-tracking subset.
+
+\textbf{Linear} is the most developer-oriented of the group. It prioritises speed and keyboard-driven workflows, and its data model is simpler than Jira's. It is popular in startups that find Jira too heavy.
+
+\textbf{Trello} takes a minimalist card-and-column approach (Kanban only) and is easy to onboard. It does not support epics or structured hierarchies by default, which makes it unsuitable for projects that need to link low-level tickets to business objectives.
+
+The common limitation of all four tools is data residency. None of them can guarantee that company data stays within a specific jurisdiction or server, and the company is subject to the vendor's security posture, breach notifications, and data retention policies. For Canny Vision, which processes video feeds from physical premises and stores analysis results, storing work items on an external SaaS platform creates an unacceptable dependency.
+
+\subsection{Self-Hosted Open-Source Alternatives}
+
+Self-hosted systems address the data sovereignty issue but introduce a maintenance burden.
+
+\textbf{Plane} is an open-source alternative to Linear, released in 2022. It supports issues, cycles (equivalent to sprints), modules (collections of issues), and custom states. It requires a Docker stack to run, and as of its early releases, lacked fine-grained workspace-level permission control.
+
+\textbf{GitLab Issues} solves the problem for teams already on GitLab: issues, epics, milestones, and boards are built in. The drawback is that it tightly couples project management with code hosting. A company that does not want all team members in the git repository cannot cleanly separate the two concerns.
+
+\textbf{Redmine} is a mature Rails-based project management tool with a long track record. Its permission model is role-based and reasonably expressive, but its interface shows its age. Plugin quality is inconsistent, and the setup for multi-tenant access control requires custom development anyway.
+
+\textbf{Taiga} offers a clean Kanban/Scrum interface with epics and user stories. Like Plane, it needs its own infrastructure to self-host, and its access control model is relatively coarse.
+
+\subsection{Summary and Gap}
+
+\begin{table}[H]
+    \centering
+    \caption{Comparison of existing TMS solutions}
+    \label{tab:tms-comparison}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Solution} & \textbf{Data Sovereignty} & \textbf{Fine-Grained ACL} & \textbf{Epics + Tickets} & \textbf{Self-Hosted} \\
+        \midrule
+        Jira       & \texttimes & \checkmark & \checkmark & Partial (Data Center) \\
+        ClickUp    & \texttimes & \checkmark & \checkmark & \texttimes \\
+        Linear     & \texttimes & Limited    & \checkmark & \texttimes \\
+        Plane      & \checkmark & Limited    & \checkmark & \checkmark \\
+        GitLab     & \checkmark & \checkmark & \checkmark & \checkmark \\
+        Redmine    & \checkmark & Limited    & Partial    & \checkmark \\
+        \textbf{This project} & \checkmark & \checkmark & \checkmark & \checkmark \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+None of the surveyed tools satisfies all three requirements simultaneously: full data control, a permission model fine-grained enough to express workspace-level roles, and a codebase the company can own and extend. This is the gap the current project addresses.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Access Control Models}
+
+Because the permission requirements of this system are non-trivial—two distinct role scopes that interact in specific ways—it is worth reviewing the main access control paradigms and understanding why a hybrid approach was chosen.
+
+\subsection{Discretionary Access Control (DAC)}
+
+DAC gives the resource owner the right to grant or revoke access to other users. Unix file permissions are the canonical example. This model is too loose for an organisation: a user could accidentally (or intentionally) share a resource with someone who should not have it.
+
+\subsection{Role-Based Access Control (RBAC)}
+
+RBAC assigns permissions to roles, and users are assigned to roles. The classic NIST RBAC model \cite{nist_rbac} defines four levels of increasing complexity: flat RBAC (users, roles, permissions), hierarchical RBAC (role inheritance), constrained RBAC (separation of duties), and symmetric RBAC.
+
+RBAC works well when permissions map cleanly to job titles. In this system, the top-level business role—\texttt{ADMIN} or \texttt{MEMBER}—fits RBAC well: an admin has global permissions on workspaces and memberships regardless of context, and a member cannot act without being placed in a workspace first. This coarse-grained layer is issued by the IAM as a claim inside the JWT token.
+
+The limitation of pure RBAC appears at the workspace level. Knowing that a user has the role \texttt{DEVELOPER} does not fully determine whether a given request is allowed—it also depends on whether the target ticket belongs to that developer, which workspace the ticket lives in, and whether the workspace is one the user is a member of. A static role cannot express that.
+
+\subsection{Attribute-Based Access Control (ABAC)}
+
+ABAC makes authorization decisions based on attributes of the subject (the user), the resource (the object being accessed), the action, and optionally the environment (time, IP, etc.) \cite{nist_abac}. Rules are written as policies that combine these attributes.
+
+The ABAC model maps naturally to the workspace-level requirements: \textit{"a DEVELOPER can delete a ticket only if the ticket's owner is the requesting user"} is straightforwardly expressible as an attribute rule—\texttt{action == DELETE AND resource.owner == subject.username AND subject.workspace\_role == DEVELOPER}.
+
+\subsection{The XACML Standard}
+
+XACML (eXtensible Access Control Markup Language) is an OASIS standard \cite{xacml30} that formalises ABAC evaluation. Its architecture defines four components:
+
+\begin{itemize}
+    \item \textbf{PEP} (Policy Enforcement Point): intercepts the request and enforces the decision.
+    \item \textbf{PDP} (Policy Decision Point): evaluates rules and returns a decision.
+    \item \textbf{PIP} (Policy Information Point): retrieves missing attributes from external sources (database, LDAP, etc.).
+    \item \textbf{PAP} (Policy Administration Point): manages and stores policy definitions.
+\end{itemize}
+
+The standard also specifies combining algorithms—how to aggregate multiple rule decisions into one final verdict. The two most security-relevant are \textit{deny-unless-permit} (deny by default, only grant if at least one rule explicitly allows) and \textit{permit-unless-deny} (the inverse).
+
+This project does not implement XACML verbatim—the XML syntax and the full set of built-in functions are overkill for the scope. Instead, the authorization engine in the \texttt{core} module is \textit{inspired by} XACML: it has a PEP (a CDI interceptor bound to a custom \texttt{@RequireAuthorization} annotation), a PDP interface per tenant, a PIP interface for attribute enrichment, and a pluggable combining algorithm with \textit{deny-unless-permit} as the default. The design stays aligned with the standard's vocabulary while keeping the implementation lightweight.
+
+\subsection{Zero Trust Architecture}
+
+Zero Trust is a security model that rejects the idea of a trusted internal network. Every request must be authenticated and authorized regardless of where it originates \cite{nist_zerotrust}. The principle \textit{"never trust, always verify"} has concrete implications for implementation: no session sharing between services, short-lived tokens, explicit verification of identity on each request.
+
+In practice, this means the system issues JWT tokens with a short expiry from the IAM module, and every API call to the TMS presents that token. The token is verified on each request without storing session state on the server—stateless authentication. The ABAC layer then makes a fresh decision on each call based on current resource attributes, not a cached permission snapshot.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Technology Choices}
+
+\subsection{Backend: Jakarta EE on WildFly}
+
+The Java enterprise ecosystem in 2025 offers three serious contenders for a REST backend: Spring Boot, Quarkus, and Jakarta EE.
+
+\textbf{Spring Boot} is the most widely used. It favours convention over configuration and builds quickly. The trade-off is that it is opinionated and pulls a large set of transitive dependencies. Critically for this project, Spring's interceptor and CDI equivalents work slightly differently from the Jakarta EE specifications—which matters when the authorization mechanism relies on \texttt{@InterceptorBinding} annotations that must behave precisely as the spec defines.
+
+\textbf{Quarkus} is designed for cloud-native, GraalVM-native compilation, and fast startup times. It implements Jakarta EE APIs on top of its own Vert.x runtime. For a team building an internal system that runs on a managed server, the GraalVM compilation pipeline adds complexity without meaningful benefit.
+
+\textbf{Jakarta EE on WildFly} is the standard enterprise Java specification implemented by a mature, battle-tested application server. WildFly implements the full Jakarta EE 10 profile—JAX-RS for REST endpoints, CDI for dependency injection, JPA with Hibernate for persistence, and the Interceptors specification for cross-cutting concerns. The authorization layer in this project depends directly on CDI's \texttt{Instance<T>} for tenant discovery and on the Interceptors spec for the PEP binding. Using the reference implementation guarantees predictable behavior.
+
+\subsection{Frontend: Vanilla JavaScript with ESM Modules}
+
+The frontend is a Single Page Application. The main architectural decision was whether to use a JavaScript framework (React, Vue, Angular) or to write vanilla JavaScript.
+
+\textbf{React and Vue} are the dominant choices in 2025. They offer component models, reactive state management, and large ecosystems. The downside for this context is supply chain risk: a typical React project has hundreds of transitive npm dependencies, each of which is a potential attack surface. For a system handling sensitive internal data, minimising the dependency surface is not a secondary concern.
+
+\textbf{Vanilla JavaScript with ES Modules} eliminates that risk. Modern browsers support native ES module imports, dynamic \texttt{import()}, and \texttt{import.meta}—there is no need for a bundler or a build step in development. The project uses Tailwind CSS via its standalone CLI (no Node.js dependency required at runtime) and \texttt{SortableJS} as the only runtime JavaScript dependency, for drag-and-drop on the Kanban board.
+
+The architecture follows the \textbf{Model-View-Presenter} pattern. Each page module exports an \texttt{init} function that instantiates a Presenter, which coordinates a Model (responsible for API calls and reactive state via observables) and a View (responsible for DOM rendering and intent event emission). This separation makes each page independently testable and ensures that API-fetching logic is never mixed with DOM manipulation.
+
+The application also ships a Service Worker implementing a layered caching strategy—navigation requests go network-first, static assets are cache-first—making the app usable in degraded network conditions.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Chapter Conclusion}
+
+The review of existing TMS products shows that no off-the-shelf tool satisfies the combination of data sovereignty, workspace-level fine-grained access control, and full ownership that Canny Vision requires. Self-hosted open-source alternatives come close on the data question but fall short on permission granularity.
+
+The access control literature establishes that RBAC alone cannot express resource-ownership conditions. The ABAC model—formalised by XACML—provides the right vocabulary, and the Zero Trust principle supplies the security posture that governs how authentication and authorization interact at runtime.
+
+On the technology side, Jakarta EE on WildFly was selected for its standards compliance and predictable CDI behaviour, while Vanilla JS with ES Modules was chosen to minimise the supply chain surface area and keep the frontend under full internal control.
+
+The next chapter presents the architecture and design of the system built on these foundations.

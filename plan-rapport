@@ -1,0 +1,54 @@
+Foreword (1 page)
+Include the internship details, duration, company name, project context, and a presentation of the host organization.
+
+General Introduction (1 to 3 pages)
+Define the work context, field, problem statement, and internship objectives.
+
+Detail the work completed and provide an overview of the chapter contents.
+
+Chapter 1: State of the Art
+Provide a comprehensive review of the topic.
+
+Include a comparative table summarizing this state of the art.
+
+Use this section to justify the specific technologies or methods you chose to implement.
+
+End the chapter with a paragraph introducing the application you are developing, the specific problems it solves, and a transition to the details covered in Chapter 2.
+
+Chapter 2: Modeling and Design of the Proposed Solution
+Give your application a specific name/brand.
+
+Detail the design, architecture, and modeling of your solution.
+
+Chapter 3: Environment and Implementation Phases
+IT Tools: List the technologies and tools used.
+
+Implementation Phases: Describe the various phases of development (e.g., setting up the server entity, database creation, development of the connection modules, web/mobile client, etc.).
+
+Chapter 4: Analysis, Testing, and Performance Evaluation
+Note: This is where you detail the final realization/execution, not in Chapter 3.
+
+Define specific test scenarios.
+
+For each scenario, provide screenshots, followed by execution results (e.g., graphs or logs).
+
+Provide an analysis of the results.
+
+Performance Metrics: Include Quality of Service (QoS) measurements such as packet loss, throughput, blocking rates, failed connections, security parameters, and error message handling.
+
+Conclusion of the chapter: List the problems encountered, proposed solutions, and potential future improvements (Perspectives).
+
+General Conclusion
+Bibliography
+Must be well-formatted and professional.
+
+References must be numbered and indexed within the text (e.g., [1]).
+
+Format: [Ref] Title, Author, Type, Date of creation.
+
+For books, include the ISBN and publisher.
+
+For websites, include the date of access (e.g., "Accessed on...").
+
+Appendices
+Include one or two relevant appendices to support your work.

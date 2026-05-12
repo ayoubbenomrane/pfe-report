@@ -1,0 +1,108 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%----------------------------------------------------------------------------------
+% DO NOT Change this is the required setting A4 page, 11pt, oneside print, book style
+%%----------------------------------------------------------------------------------
+\documentclass[a4paper,11pt,oneside]{book}
+\usepackage{CS_report} 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+    \captionsetup[figure]{margin=1.5cm,font=small,name={Figure},labelsep=colon}
+    \captionsetup[table]{margin=1.5cm,font=small,name={Table},labelsep=colon}
+
+    \frontmatter
+    \pagenumbering{arabic} % Start counting at 1 immediately
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% COVER PAGE — Forced to show Footer
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \begin{titlepage}
+        \thispagestyle{fancy} % <--- THIS FORCES THE FOOTER ON THE COVER
+        
+        % Logo 
+        \noindent\includegraphics[width=5cm]{figures/logo_supcom.png}
+
+        \vspace{0.2cm}
+        \noindent\rule{\textwidth}{1.2pt}
+        \vspace{0.4cm}
+
+        \begin{center}
+            {\large\textit{Telecommunications Engineering Degree Programme}}\\[0.1cm]
+            {\large\textit{Option: Cyber Security and Defense (CySed)}}\\[0.8cm]
+
+            {\fontsize{22}{28}\selectfont\textbf{Final Year Project Report}}\\[0.8cm]
+
+            {\large\textit{Subject:}}\\[0.2cm]
+            {\Large\guillemotleft\ Canny TMS\ \guillemotright}\\[0.8cm]
+
+            {\large\textit{Prepared by:}}\\[0.2cm]
+            {\Large Mohamed Ayoub Ben Omrane}\\[0.6cm]
+
+            {\large\textit{Supervisors:}}\\[0.2cm]
+            {\large Mr Mohamed-Bêcha Kaaniche}\\[0.1cm]
+            {\large Mr Mourad Menif}\\[0.6cm]
+
+            {\large\textit{Project proposed and carried out in collaboration with}}\\[0.2cm]
+            %{\large\textcolor{black}{Canny Vision}}\\[0.3cm]
+            \includesvg[width=2.5cm]{figures/logo_cannyvision}\\[0.5cm]
+
+            {\large Academic year: 2025-2026}
+        \end{center}
+
+        \vfill 
+        \begin{center}
+            \setlength{\fboxsep}{0pt} 
+            % 1. The Navy Top Border
+            \colorbox{SupcomNavyBorder}{% 
+                \parbox{\textwidth}{\rule{0pt}{3pt}} 
+            }\\[-1pt] 
+            % 2. The Light Blue Background Box
+            \setlength{\fboxsep}{10pt}
+            \colorbox{SupcomLightBlue}{%
+                \parbox{\dimexpr\textwidth-2\fboxsep}{%
+                    \centering\small\color{black} % Text should be black on light blue
+                    Ecole Supérieure des Communications de Tunis\\[2pt]
+                    \textbf{SUP'COM}\\[2pt]
+                    \textit{2083 Cité Technologique des Communications -- Elghazala -- Ariana -- Tunisie}\\[2pt]
+                    \textit{Tél. +216 70 240 900 \textendash\ site web : www.supcom.tn}
+                }%
+            }
+        \end{center}
+        % Note: The footer will appear BELOW this box because of \thispagestyle{fancy}
+    \end{titlepage}
+
+    % -------------------------------------------------------------------
+    % Following Pages (Abstract, etc.)
+    % -------------------------------------------------------------------
+    % DO NOT reset pagenumbering here, so the next page naturally becomes Page 2
+    
+    \input{chapters/00_abstract}
+    \input{chapters/00_i_foreword}
+
+    \tableofcontents
+    \listoffigures
+    \listoftables
+
+    \input{glossaries}
+    \input{chapters/00_ii_general_introduction}
+
+    \mainmatter 
+    % Note: \mainmatter usually resets page numbers to 1. 
+    % If you want continuous numbering (Cover=1, Intro=7, etc.), 
+    % comment out \mainmatter or use \pagenumbering{arabic} again after it.
+
+    \input{chapters/01_state_of_the_art}
+    \input{chapters/02_modeling_and_design}
+    \input{chapters/03_environment_and_implementation}
+    \input{chapters/04_analysis_testing_performance}
+    \input{chapters/05_general_conclusion}
+
+    \begin{appendices}
+        \input{chapters/appendix_A.tex}
+        \input{chapters/appendix_B.tex}
+    \end{appendices}
+
+    \bibliography{references}
+
+\end{document}

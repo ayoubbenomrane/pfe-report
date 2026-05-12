@@ -1,0 +1,84 @@
+\chapter{Modeling and Design of the Proposed Solution}
+
+\section{Introduction}
+Introduce the proposed application and define its official name or brand.
+
+\section{Requirements Analysis}
+\begin{itemize}
+    \item Functional requirements
+    \item Non-functional requirements
+    \item Constraints and assumptions
+\end{itemize}
+
+\section{Global Architecture}
+Describe the high-level architecture and module decomposition (frontend, backend, data, IAM, etc.).
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.9\textwidth]{figures/architecture-overview.png}
+    \caption{High-level architecture of the proposed solution}
+    \label{fig:architecture-overview}
+\end{figure}
+
+\section{Modeling}
+Include relevant models and diagrams:
+\begin{itemize}
+    \item use case diagrams,
+    \item class or domain model,
+    \item sequence or activity diagrams,
+    \item database model if applicable.
+\end{itemize}
+
+\section{Design Decisions}
+Explain key decisions and trade-offs:
+\begin{itemize}
+    \item chosen frameworks and patterns,
+    \item security and authorization choices,
+    \item scalability and maintainability considerations.
+\end{itemize}
+
+\section{Chapter Conclusion}
+Summarize how the design responds to identified requirements and prepares implementation.
+
+// my own words that claude will use later to generate the actual content of the chapter.
+
+
+./path means the root of the opened folder (rapport-pfe)
+
+#introduction
+Canny TMS, a custom-built Ticket Management System designed to meet the specific needs of Canny Vision, was my responsability
+to design and develop.
+#requirements analysis
+## functional requirements
+Canny vision already has its own internal identity access managment software that handles authenticatoin and authorizatoin
+that's based on oauth2.1 with pkce (dear claude read ./middleware/iam module for more details and to understand how the iam works in detail)
+so the app that I developed had to be compatible with the existing IAM and use it for all authentication and authorization needs.
+Canny vision also don't use any frameworks or libraries for the frontend, so the app had to be developed using vanilla js and no external dependencies.
+that's why they have their own developed mvp engine (youc can read ./frontend/scripts/mvp.js to understand how it works) that I had to use for the frontend development.
+the app also had to be developed using a zero trust architecture, which means that all security measures had to be implemented internally and no data could be stored on external servers.
+## non functional requirements
+the ui/ux design had to be simple and intuitive, and the app had to be responsive and accessible on different devices.
+the app also had to be scalable and maintainable, as it would be used by multiple teams
+and would need to evolve over time to meet changing requirements.
+#global architecture
+I will pass a figure here later that shows the high level architecture of the system
+ read it yourself and wrtie what you see fit
+#modeling
+same thing too for global architecute
+#design decisions
+
+bootstrap vs tailwindcss
+I started with bootsrap , which is the company choice (imported from cdn ; doesn't expose secuirty issues)
+it's good because blah blah but it limits the design and makes it look like every other bootstrap app, and it also has a lot of unused css that affects performance.
+I convinced Mr Kaaniche to switch to tailwindcss, which is a utility-first css framework that allows for more flexibility and better performance.
+In normal methods (not so secure app) it should be installed via npm and used as a build tool, but since we can't use any external dependencies, I used it with standalone cli where I isntalled the engine locally
+read : https://tailwindcss.com/blog/standalone-cli  and put it in the report in its place(idk the actual page where we should put from wehre we got our information)
+
+
+abac: 
+nist standard : I spent time reading and analyzing the nist standard for access control : here's the link https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-162.pdf
+integrate it too in the report
+to actually implenet it I used authZforce whihc is an open source xacml engine where I donwloade the source code and inspired from to implmeent my own
+
+[I will put here the figure of nist compliant abac]
+and saying how I didn't implement PAP because it's too next leven and maybe later 

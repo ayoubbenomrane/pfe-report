@@ -1,0 +1,15 @@
+# Ignore everything
+*
+frontend/tailwindcss
+
+# Allow git config files
+!.gitignore
+
+# Allow Latex directory
+!Latex/
+!Latex/**
+
+
+!plan-rapport
+!Guide
+!Guide\ rédaction_PFE\ mai26-\ ID145\ VER2entete.docx.pdf
