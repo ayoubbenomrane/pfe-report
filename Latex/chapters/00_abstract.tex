@@ -2,25 +2,35 @@
 \addcontentsline{toc}{chapter}{Abstract}
 
 {\setstretch{1.2}
-Write a concise summary of the entire project in \textbf{200--300 words}. The abstract must stand alone and cover:
-\begin{itemize}
-    \item the context and motivation (one or two sentences),
-    \item the problem addressed and objectives,
-    \item the proposed solution and the main technical contributions,
-    \item the key results obtained,
-    \item a brief closing statement on impact or future directions.
-\end{itemize}
+Canny Vision is a Tunisian company specializing in computer vision solutions, whose
+project teams require an efficient means of tracking tasks, managing goals, and resolving
+technical issues across multiple concurrent projects. Existing commercial platforms such as
+Jira or ClickUp were ruled out on two grounds: hosting sensitive project data on third-party
+servers raises data-sovereignty and security concerns incompatible with the company's
+zero-trust posture, and no off-the-shelf tool can be fully tailored to the company's specific
+workflows and internal constraints.
+
+This report presents \textbf{Canny TMS}, a custom-built Ticket Management System designed
+and developed as an end-to-end internal solution for Canny Vision. The system integrates
+seamlessly with the company's pre-existing Identity and Access Management infrastructure,
+based on OAuth~2.1 with PKCE, ensuring that all authentication and authorization flows
+remain under full organizational control. The frontend is implemented in pure vanilla
+JavaScript using the company's in-house MVP rendering engine, with no reliance on
+third-party libraries. A fine-grained Attribute-Based Access Control model, conformant
+with the NIST SP~800-162 standard, enforces workspace-level authorization policies and
+governs every protected operation within the system.
+
+Canny TMS is fully operational and currently in production use across multiple teams at
+Canny Vision. It supports the complete lifecycle of epics and tickets --- from creation
+and assignment to status tracking and threaded commenting --- while maintaining strict
+data isolation within a self-hosted deployment.
+
+The system demonstrates how security-first design constraints and a zero-external-dependency
+policy can be reconciled with a productive and user-friendly collaboration tool, and lays
+the groundwork for future enhancements such as a Policy Administration Point and advanced
+analytics dashboards.
 
 \bigskip
-\noindent\textbf{Keywords:} keyword 1, keyword 2, keyword 3, keyword 4, keyword 5.
+\noindent\textbf{Keywords:} ticket management, zero-trust architecture, OAuth~2.1 with PKCE,
+attribute-based access control, vanilla JavaScript.
 }
-
-
-
-
-CONTENT IS: 
-CANNY TMS is a ticket management system tailored to the needs of Canny Vision, a company specializing in computer vision solutions.
-Using available tools and services like Jira or Click UP can be a security issue because the personal data and will be placed on their servers
-also the features available will never reflect 100% the full needs of the compant
-This ticket management system ihelps Canny Vision's teams to efficiently track, manage, and resolve issues and goals related to their projects with having the solutin dicretly deployed in theri servers
-the tms is working and is currently beings used by the teams of Canny Vision
