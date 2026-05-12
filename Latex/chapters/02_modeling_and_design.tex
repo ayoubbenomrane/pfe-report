@@ -2,11 +2,11 @@
 
 \section{Introduction}
 
-Canny TMS (Ticket Management System) is a custom-built internal web application conceived
+Canny TMS is a custom-built internal web application conceived
 and developed to meet the specific operational needs of Canny Vision. Designing and
 implementing this system from end to end was my full responsibility --- from requirements
 analysis through architecture, data modeling, security design, and the final deployed
-product. The overarching goal was to provide Canny Vision's teams with a secure,
+product. The final goal was to provide Canny Vision's teams with a secure,
 self-hosted platform for managing epics, tickets, and team collaboration, while strictly
 respecting the company's technical and security constraints.
 
@@ -28,8 +28,7 @@ the supply-chain risk associated with third-party packages.
 
 Finally, the application had to conform to a zero-trust architecture: all data must reside
 on Canny Vision's own infrastructure, and every protected operation must be validated
-internally by the application itself rather than relying on network-perimeter controls.
-
+internally by the application itself.
 \subsection{Non-Functional Requirements}
 
 Beyond functional correctness, the following non-functional properties were required:
@@ -60,14 +59,21 @@ Beyond functional correctness, the following non-functional properties were requ
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=0.9\textwidth]{figures/architecture-overview.png}
+    \includesvg[width=0.9\textwidth]{figures/highArchitecture}
     \caption{High-level architecture of Canny TMS}
     \label{fig:architecture-overview}
 \end{figure}
 
-% TODO: describe layers once the figure is inserted.
-% Expected layers: IAM (OAuth 2.1 / PKCE), REST API middleware (Jakarta EE / Quarkus),
-% persistence (relational database via JPA), vanilla-JS frontend served as static assets.
+The system is organised into three tiers. The \textbf{frontend} is the SPA running in the
+user's browser --- a vanilla JavaScript application delivered as static files. The
+\textbf{middleware} tier is \textbf{WildFly}'s embedded web server, Undertow, which serves
+those static files directly from the filesystem, terminates TLS, enforces CORS and
+security headers, and routes requests to the appropriate deployed module. The
+\textbf{backend} tier consists of two WAR deployments running inside the same WildFly
+instance: the \textbf{IAM module}, which handles authentication and token validation, and
+the \textbf{API module}, which implements the business logic --- both backed by a
+\textbf{MySQL} database whose connection pool is also managed by WildFly.
+
 
 \section{Modeling}
 
@@ -75,22 +81,21 @@ Beyond functional correctness, the following non-functional properties were requ
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=0.9\textwidth]{figures/use-case.png}
+    \includegraphics[width=0.75\textwidth]{figures/useCaseDiagram}
     \caption{Use-case diagram of Canny TMS}
     \label{fig:use-case}
 \end{figure}
 
 \subsection{Entity-Relationship Diagram}
 
-The persistent data model of Canny TMS is organized around seven core entities:
+The data model of Canny TMS is structured around seven core entities:
 \texttt{Workspace}, \texttt{Actor}, \texttt{Membership}, \texttt{Epic}, \texttt{Ticket},
 \texttt{EpicComment}, and \texttt{TicketComment}.
-Figure~\ref{fig:erd} presents the entity-relationship diagram derived from the JPA
-entity classes.
+Their relationships and attributes are illustrated in Figure~\ref{fig:erd}.
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=\textwidth]{figures/erd.png}
+    \includesvg[width=\textwidth]{figures/erd}
     \caption{Entity-Relationship Diagram of Canny TMS}
     \label{fig:erd}
 \end{figure}
@@ -106,6 +111,29 @@ Tickets support threaded comments (\textbf{EpicComment} and \textbf{TicketCommen
 a maximum nesting depth of one reply level enforced at the application layer.
 
 \section{Design Decisions}
+
+\subsection{Application Server: WildFly}
+
+Most web projects split their infrastructure into separate pieces: a reverse proxy like
+Nginx in front, an application server behind it, and some kind of connection pool manager
+on top. WildFly collapses all of that into a single platform, and that is precisely why it
+was chosen here.
+
+Its embedded web server, Undertow, handles everything the frontend needs from a server:
+static file serving from a directory on disk, the 404-to-\texttt{index.html} fallback that
+makes client-side routing work, TLS termination via the Elytron security framework (TLS
+1.3 only, with strong cipher suites), HTTP-to-HTTPS redirects, HSTS, CORS policy
+enforcement, and cache-control headers. None of those required any application code ---
+they are all configured at the server level through WildFly's CLI.
+
+The two application modules --- the IAM and the API --- are deployed as standard WAR files
+into the same WildFly instance. The MySQL connection pool is managed through WildFly's
+datasource subsystem and exposed to the application via JNDI. Access logging is
+configured per virtual host.
+
+Running everything under one platform means one log file, one configuration system, and
+one deployment target. For a self-hosted, single-server setup, this is straightforwardly
+simpler than maintaining separate components.
 
 \subsection{CSS Framework: From Bootstrap to Tailwind CSS}
 
@@ -151,112 +179,53 @@ The design was informed by a detailed study of \textbf{AuthZforce}, an open-sour
 engine, whose source code and architecture served as a reference during the design phase.
 
 The \textbf{Policy Administration Point} (PAP) --- which would allow non-technical
-administrators to define and manage policies at runtime --- represents a significant
-undertaking and is deferred to a future iteration of the system.
+administrators to define and modify policies at runtime --- was intentionally left out of
+scope. Given the fixed, well-defined permission model of Canny TMS, a dynamic PAP would
+add significant complexity without a practical benefit.
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=0.85\textwidth]{figures/abac-nist.png}
-    \caption{NIST-compliant ABAC architecture as implemented in Canny TMS (PAP deferred)}
+    \includegraphics[width=0.8\textwidth]{figures/nistABAC}
+    \caption{ABAC reference model from NIST SP~800-162: a Subject's request (step~1) is
+             evaluated by the Access Control Mechanism against the Access Control Policy
+             (2a), Subject Attributes (2b), Object Attributes (2c), and Environment
+             Conditions (2d) before access to the Object is granted or denied (step~3)}
     \label{fig:abac-nist}
 \end{figure}
 
+\subsection{Progressive Web App Strategy}
+
+Canny TMS is delivered as a Progressive Web App. The reasoning is simple: the people
+using this tool are not always at a desk with a stable connection. Being able to browse
+tickets on a phone with patchy Wi-Fi, or get a notification when something is assigned,
+makes a real difference in day-to-day use.
+
+The caching strategy is \textit{Network with Cache Fallback}. The Service Worker tries
+the network on every request; if it fails, it returns the cached version. This is the
+right fit for a read-heavy tool where most interactions are browsing boards and reviewing
+ticket details.
+
+Offline writes are handled by the \textbf{Background Sync API}. When a team member
+updates something while offline, the change is saved locally in IndexedDB. The moment
+connectivity is restored, the Service Worker sends the queued request to the server ---
+no manual retry needed on the user's side.
+
+For push notifications, the \textbf{Web Push API} is used. The server sends a
+notification whenever a ticket is assigned to a user. This maps directly to the
+\textit{Manage Tickets} and \textit{Manage Epics} use cases: the assigned team member
+knows immediately, without having to keep the board open.
+
+All of this runs on standard browser APIs, no extra dependencies added.
+
 \section{Chapter Conclusion}
 
-This chapter presented the requirements, architecture, data model, and key design
-decisions that underpin Canny TMS. The functional requirements --- IAM integration via
-OAuth~2.1 with PKCE, a dependency-free frontend, and a zero-trust data policy --- directly
-shaped every layer of the system. The adoption of the Tailwind CSS standalone CLI and the
-NIST SP~800-162-conformant ABAC model reflect deliberate trade-offs between developer
-ergonomics, security guarantees, and the constraints imposed by the client's environment.
-The following chapter details the concrete technologies and tools used during
-implementation and presents the resulting system.
+The requirements, architecture, and design choices covered in this chapter all trace back
+to the same starting point: the constraints Canny Vision operates under. The dependency
+policy drove the frontend approach, the existing IAM determined how authentication works,
+and the multi-role access model made a simple RBAC scheme insufficient. Each decision ---
+from the Tailwind standalone CLI, to WildFly as the single deployment platform, to the
+ABAC policy engine, to the PWA caching and notification strategy --- has a concrete reason
+behind it rather than being an arbitrary technical preference.
+The next chapter moves to the implementation itself: the technologies selected, how the
+components were built, and what the finished system looks like in practice.
 
-
-%% ============================================================
-%% MERMAID ERD — copy-paste ready (render at mermaid.live or
-%% paste into your diagram tool, then export as figures/erd.png)
-%% ============================================================
-%%
-%% erDiagram
-%%     WORKSPACE {
-%%         smallint     id           PK
-%%         bigint       version
-%%         varchar_150  name
-%%         varchar_1000 description
-%%         datetime     created_at
-%%     }
-%%     ACTOR {
-%%         varchar_191  username     PK
-%%         bigint       version
-%%         varchar      fullname
-%%         varchar      email
-%%     }
-%%     MEMBERSHIP {
-%%         smallint     workspace_id    PK,FK
-%%         varchar_191  actor_username  PK,FK
-%%         bigint       version
-%%         enum         workspace_role  "TECH_MANAGER|BUSINESS_MANAGER|DEVELOPER|COMMERCIAL|CLIENT"
-%%     }
-%%     EPIC {
-%%         bigint       id           PK
-%%         bigint       version
-%%         smallint     workspace_id FK
-%%         varchar      title
-%%         text         description
-%%         enum         status       "PENDING|ACHIEVED|FAILED"
-%%         date         start_at
-%%         date         due_date
-%%         varchar_191  owner        FK
-%%         varchar_191  assigned_to  FK
-%%     }
-%%     TICKET {
-%%         bigint       id           PK
-%%         bigint       version
-%%         smallint     workspace_id FK
-%%         bigint       epic_id      FK
-%%         varchar_200  title
-%%         varchar_2000 description
-%%         varchar_191  owner        FK
-%%         varchar_191  assigned_to  FK
-%%         enum         status       "OPEN|IN_PROGRESS|DELAYED|BLOCKING_ISSUE|TERMINATED"
-%%         enum         priority     "CRITICAL|HIGH|MEDIUM|LOW"
-%%         int          workload
-%%         datetime     created_at
-%%         date         start_at
-%%         date         due_date
-%%     }
-%%     EPIC_COMMENT {
-%%         bigint       id           PK
-%%         bigint       version
-%%         bigint       epic_id      FK
-%%         varchar_191  owner        FK
-%%         text         content
-%%         bigint       parent_id    FK
-%%         datetime     created_at
-%%     }
-%%     TICKET_COMMENT {
-%%         bigint       id           PK
-%%         bigint       version
-%%         bigint       ticket_id    FK
-%%         varchar_191  owner        FK
-%%         text         content
-%%         bigint       parent_id    FK
-%%         datetime     created_at
-%%     }
-%%
-%%     WORKSPACE      ||--o{ MEMBERSHIP     : "has"
-%%     WORKSPACE      ||--o{ EPIC           : "contains"
-%%     WORKSPACE      ||--o{ TICKET         : "contains"
-%%     ACTOR          ||--o{ MEMBERSHIP     : "member of"
-%%     ACTOR          ||--o{ EPIC           : "creates"
-%%     ACTOR          ||--o{ EPIC           : "assigned to"
-%%     ACTOR          ||--o{ TICKET         : "creates"
-%%     ACTOR          ||--o{ TICKET         : "assigned to"
-%%     ACTOR          ||--o{ EPIC_COMMENT   : "writes"
-%%     ACTOR          ||--o{ TICKET_COMMENT : "writes"
-%%     EPIC           ||--o{ TICKET         : "groups"
-%%     EPIC           ||--o{ EPIC_COMMENT   : "has"
-%%     TICKET         ||--o{ TICKET_COMMENT : "has"
-%%     EPIC_COMMENT   ||--o{ EPIC_COMMENT   : "replies to"
-%%     TICKET_COMMENT ||--o{ TICKET_COMMENT : "replies to"

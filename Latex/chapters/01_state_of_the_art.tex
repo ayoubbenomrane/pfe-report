@@ -114,7 +114,9 @@ The Java enterprise ecosystem in 2025 offers three serious contenders for a REST
 
 \textbf{Quarkus} is designed for cloud-native, GraalVM-native compilation, and fast startup times. It implements Jakarta EE APIs on top of its own Vert.x runtime. For a team building an internal system that runs on a managed server, the GraalVM compilation pipeline adds complexity without meaningful benefit.
 
-\textbf{Jakarta EE on WildFly} is the standard enterprise Java specification implemented by a mature, battle-tested application server. WildFly implements the full Jakarta EE 10 profile—JAX-RS for REST endpoints, CDI for dependency injection, JPA with Hibernate for persistence, and the Interceptors specification for cross-cutting concerns. The authorization layer in this project depends directly on CDI's \texttt{Instance<T>} for tenant discovery and on the Interceptors spec for the PEP binding. Using the reference implementation guarantees predictable behavior.
+\textbf{Jakarta EE on WildFly} is the standard enterprise Java specification implemented by a mature, battle-tested application server. WildFly implements the full Jakarta EE 10 profile --- JAX-RS for REST endpoints, CDI for dependency injection, JPA with Hibernate for persistence, and the Interceptors specification for cross-cutting concerns. The authorization layer in this project depends directly on CDI's \texttt{Instance<T>} for tenant discovery and on the Interceptors spec for the PEP binding. Using the reference implementation guarantees predictable behavior.
+
+What makes WildFly stand out in this context is that it goes beyond just running the application code. Its embedded web server, \textbf{Undertow}, handles everything that a reverse proxy like Nginx would normally be responsible for: serving the frontend's static files, the 404-to-\texttt{index.html} fallback that client-side routing needs, TLS termination, HSTS, CORS, and security headers. The two application modules --- the IAM and the API --- are deployed as WAR files inside the same WildFly instance, and database connections are managed through its datasource subsystem. The result is a single platform that replaces what would otherwise be three or four separate components to configure and maintain.
 
 \subsection{Frontend: Vanilla JavaScript with ESM Modules}
 
@@ -126,7 +128,35 @@ The frontend is a Single Page Application. The main architectural decision was w
 
 The architecture follows the \textbf{Model-View-Presenter} pattern. Each page module exports an \texttt{init} function that instantiates a Presenter, which coordinates a Model (responsible for API calls and reactive state via observables) and a View (responsible for DOM rendering and intent event emission). This separation makes each page independently testable and ensures that API-fetching logic is never mixed with DOM manipulation.
 
-The application also ships a Service Worker implementing a layered caching strategy—navigation requests go network-first, static assets are cache-first—making the app usable in degraded network conditions.
+The application is delivered as a Progressive Web App, which is covered in the next subsection.
+
+\subsection{Progressive Web App}
+
+A Progressive Web App (PWA) is a web application that uses standard browser APIs to behave
+closer to a native application --- without going through an app store or requiring any
+installation beyond a browser prompt. The two core building blocks are the
+\textbf{Service Worker} (a background script the browser runs separately from the page) and
+the \textbf{Web App Manifest} (a JSON file that describes the app's name, icon, and
+display mode).
+
+For a team-facing tool like Canny TMS, two PWA capabilities matter in practice.
+
+\textbf{Offline access.} The caching strategy chosen here is \textit{Network with Cache
+Fallback}: the Service Worker intercepts every request and tries the network first. If the
+network is not reachable, it serves the last cached version instead of showing an error.
+This way, someone checking their ticket board from a location with poor connectivity still
+sees something useful. For write operations that happen while offline --- updating a ticket
+status, for example --- the \textbf{Background Sync API} takes over: the pending request
+is stored locally in IndexedDB, and as soon as the connection comes back, the Service
+Worker picks it up and sends it to the server automatically.
+
+\textbf{Push notifications.} The \textbf{Web Push API} lets the server send a notification
+to the user's device even when the app is not open. In Canny TMS, this is wired to
+assignment events: when a ticket is assigned to a team member, they get a notification
+right away instead of having to refresh the board periodically.
+
+Both features are built entirely on native browser APIs. No additional JavaScript library
+or framework is needed, which keeps the zero-dependency policy intact.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 \section{Chapter Conclusion}
@@ -135,6 +165,6 @@ The review of existing TMS products shows that no off-the-shelf tool satisfies t
 
 The access control literature establishes that RBAC alone cannot express resource-ownership conditions. The ABAC model—formalised by XACML—provides the right vocabulary, and the Zero Trust principle supplies the security posture that governs how authentication and authorization interact at runtime.
 
-On the technology side, Jakarta EE on WildFly was selected for its standards compliance and predictable CDI behaviour, while Vanilla JS with ES Modules was chosen to minimise the supply chain surface area and keep the frontend under full internal control.
+On the technology side, Jakarta EE on WildFly was selected for its standards compliance, predictable CDI behaviour, and because Undertow removes the need for a separate reverse proxy. Vanilla JS with ES Modules keeps the frontend under full internal control with no supply chain exposure, and the PWA layer adds offline access and push notifications using nothing but standard browser APIs.
 
 The next chapter presents the architecture and design of the system built on these foundations.
