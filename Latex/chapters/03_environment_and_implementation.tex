@@ -1,3 +1,5 @@
+[DEAR claude text between [] like this is a sign that this is a note for you, not part of the output. Please do not include it in the final answer. It is just to help you understand the context and what I want to say. Thank you!]
+[the current version uses words in a very un technical and unformal way fix it]
 \chapter{Environment and Implementation}
 
 \section{Introduction}
@@ -12,7 +14,9 @@ phased progression from a working local environment to a deployed application.
 \section{Development Environment}
 
 \subsection{Migrating to Linux}
-
+[change workstation with laptop ; workstatoin is so diffficlt to understand , do not make this paragraph comlicated just explain how windows
+ can't do the job for my project and I switched to linux ubuntu 24.04 LTS and how one of the main reasons is because the deployment server use ubuntu 24.04 
+ and I wanted to have the same environment for development and deployment]
 The workstation originally ran Windows. WildFly's management CLI relies on shell scripting
 and file-permission semantics that translate poorly under WSL, and the Elytron-based TLS
 configuration involves keytool commands that behave differently depending on which JDK is
@@ -21,7 +25,9 @@ switch the operating system entirely to Linux. From that point, server managemen
 certificate handling, and Maven builds all worked predictably from a single terminal.
 
 \subsection{WildFly: Not Your Everyday Application Server}
-
+[brother !!! not your everyday application server ! this is so much bad phrasing for a report , it feels like a blog post]
+[please read middleware/core/configs there is clear steps on how to configure the wildfly server just don't go tooo deep in technical details just give an overview of the process
+ of how we configured the wildfly server]
 WildFly is not a server you configure with a handful of YAML files and restart in ten
 seconds. Its domain model --- subsystems, socket bindings, security realms, deployment
 descriptors, JNDI resources --- takes time to internalize. The official documentation is
@@ -32,26 +38,6 @@ TLS termination, CORS policy enforcement, HSTS headers, database connection pool
 JNDI, and WAR deployment --- all configured consistently through its CLI. For a
 self-hosted setup, that consolidation is worth the upfront learning cost.
 
-\subsection{Three Days and a Certificate}
-
-The single most time-consuming obstacle during setup had nothing to do with application
-code. After TLS was configured for the IAM module running at \texttt{iam.localhost}, the
-frontend's fetch requests continued to fail with \texttt{SSLHandshakeException}, despite
-the certificate appearing to be correctly installed.
-
-The root cause, discovered after three days of logging and keytool inspection, was a
-permissions mismatch. The \texttt{mkcert} command used to generate the local CA
-certificate had been run with \texttt{sudo}. The resulting root certificate was installed
-into the system truststore under the root user, and subsequently imported into the Oracle
-JDK's \texttt{cacerts} file using \texttt{keytool} --- also under \texttt{sudo}. When
-WildFly was later started as a normal user, the JVM resolved its cacerts from the
-non-root user's environment, which had never seen the certificate. The two users' JDK
-installations were pointing to different keystores.
-
-The fix was straightforward once the cause was identified: regenerate the mkcert root CA
-as the normal user and import it into the JDK cacerts that the application server actually
-reads at runtime. The lesson was less about certificates and more about how JVM trust
-resolution works in a multi-user Linux environment.
 
 \section{Technology Stack}
 
@@ -60,11 +46,13 @@ resolution works in a multi-user Linux environment.
     \caption{Main technologies used in Canny TMS}
     \label{tab:techstack}
     \begin{tabular}{ll}
+        [do not hallucinate if you need some information just ask me and I will provide it to you , do not make up information that is not in the report or that I didn't provide you with]
+
         \hline
         \textbf{Layer} & \textbf{Technology} \\
         \hline
-        Application server   & WildFly 35 (Undertow, Elytron, JNDI)  \\
-        Backend language     & Java 21 (Jakarta EE 11, MicroProfile Config 3.1) \\
+        Application server   & Wildfly Preview 39.0.0.Final   \\
+        Backend language     & Java 21  \\
         ORM                  & Hibernate 7 (JPA provider)            \\
         Build system         & Maven (multi-module POM)              \\
         Database             & MySQL                                 \\
@@ -78,6 +66,10 @@ resolution works in a multi-user Linux environment.
 \end{table}
 
 \section{Middleware Architecture: A Maven Multi-Module Project}
+[I want to add a note that in my dev environment I have a local IAM module even though in deployment the IAM is already deployed and I just connect to it
+and I want to state that in order for me to learn and  give value to my work that I received an old version of the IAM module
+that had many errors that I was resonsible to fix in the goal of me understanding how the IAM works in depth and not jsut operate on it
+as a black box ]
 
 The backend is structured as a Maven multi-module project named \texttt{tms}, with three
 child modules: \textbf{core}, \textbf{iam}, and \textbf{api}. The parent POM declares the
@@ -99,7 +91,8 @@ middleware/
 
 \subsection{The Core Module}
 
-\texttt{core} is packaged as a JAR and is listed as a compile-time dependency of both
+\texttt{core}
+ is packaged as a JAR and is listed as a compile-time dependency of both
 \texttt{iam} and \texttt{api}. It contains everything that the two application modules
 need but that should not be duplicated: the ABAC framework abstractions
 (\texttt{PolicyDecisionPoint}, \texttt{PolicyEnforcementPoint},
