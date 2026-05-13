@@ -42,3 +42,117 @@ Conclude the chapter by summarizing:
     \item applied or proposed solutions,
     \item future improvement opportunities.
 \end{itemize}
+
+
+
+
+
+-- read /middleware/api/src/main/java/vision/canny/api/security/interceptors/AuthenticationFilter
+(ai generated - to be simplified)
+Concurrency Bug in JWT Authentication Filter — Investigation & Resolution
+1. Problem Discovery
+During the integration phase between the frontend application and the backend REST API deployed on WildFly, an intermittent and seemingly random authentication failure was observed. Certain API requests would return HTTP 403 Forbidden responses with the message "Access denied: subject has no membership in this workspace", despite the user being a legitimate member of the workspace in question. What made this particularly confusing was the non-deterministic nature of the failures — the same endpoint, called with the same token, would succeed on some invocations and fail on others, with no apparent pattern.
+
+2. Initial Hypothesis: Frontend Issue
+The first suspicion fell on the frontend. The natural assumption was that the JWT access token was either missing from some requests, malformed, or not being attached to the Authorization header correctly.
+
+To verify this, logging was added to the authentication filter to print the full token value on every incoming request:
+
+
+logger.info("****************** token is *******  " + token + "||| end of token");
+The server logs confirmed that every failing request carried a valid, well-formed token — identical to the one used in successful requests. The frontend was not the problem.
+
+3. Isolating with Postman
+The next step was to reproduce the failure in a controlled environment using Postman. Every single request made through Postman succeeded without exception, even when repeated dozens of times against the same endpoints that were failing from the frontend.
+
+This was a critical observation. It meant the bug was not in:
+
+The token itself
+The token validation logic in isolation
+The database membership records
+The business logic of the endpoint
+The key difference between Postman and the frontend was that Postman sends requests sequentially, one at a time, while the frontend issues multiple parallel requests — fetching workspace data, user information, tickets, and other resources simultaneously upon page load.
+
+This pointed directly toward a concurrency problem.
+
+4. Log Analysis
+Examining the WildFly server logs more carefully revealed the smoking gun. Two requests arriving at the exact same millisecond were being processed on two different threads:
+
+
+2026-05-13 09:52:10,176 INFO [...AuthenticationFilter] (default task-18) *** token is *** eyJ0eXAi...
+2026-05-13 09:52:10,176 INFO [...AuthenticationFilter] (default task-25) *** token is *** eyJ0eXAi...
+
+2026-05-13 09:52:10,320 INFO [...WorkspacePolicyEnforcementPoint] (default task-18) ...developer
+2026-05-13 09:52:10,320 INFO [...WorkspacePolicyEnforcementPoint] (default task-25) ...null
+
+2026-05-13 09:52:10,330 WARNING [...] (default task-25) PIP — Subject 'null' has no membership in workspace 3
+Both threads processed the same valid token at the same timestamp, yet one (task-18) correctly extracted the identity "developer", while the other (task-25) produced null. Since both tokens were identical and valid, the failure had to be happening inside the authentication filter itself during concurrent execution.
+
+5. Root Cause Analysis
+Bug 1 — Non-Thread-Safe Static Signature Instance (Critical)
+The AuthenticationFilter class held a static field for the cryptographic Signature object used to verify JWT signatures:
+
+
+private final static Signature signatureAlgorithm; // shared across ALL threads
+In Java, static fields belong to the class, not to any instance — meaning one single Signature object was shared across every concurrent request.
+
+java.security.Signature is a stateful, sequential object. Its correct usage follows a strict three-step protocol:
+
+
+1. initVerify(publicKey)          — initialize with the key
+2. update(dataBytes)              — feed in the data to verify
+3. boolean result = verify(sig)   — perform the check
+Under concurrent load, two threads executing these steps on the same shared object interleave in unpredictable ways:
+
+Thread task-18	Thread task-25
+initVerify(key)	
+initVerify(key) ← resets object state
+update(data)	
+verify(...) ← operates on corrupted state → returns false	
+When verify() returned false, the authentication filter treated the request as if the signature was invalid and skipped the entire identity-setting block — never calling IdentityUtility.iAm(sub). The ThreadLocal storing the username remained null from a previous (or never-initialized) state. The downstream interceptor then read null as the subject identity, resulting in the membership check failing with a 403.
+
+Bug 2 — Non-Thread-Safe HashMap Cache
+A secondary concurrency hazard was identified in the public key cache:
+
+
+private final static Map<String, PublicKey> CACHE = new HashMap<>();
+HashMap is not thread-safe. Concurrent reads and writes — particularly during cache population when a new kid (key ID) is encountered — can corrupt the map's internal structure, leading to lost entries, infinite loops, or exceptions. While this was less likely to manifest visibly, it represented a latent race condition in the same code path.
+
+6. The Fix
+Fix 1 — Per-Request Signature Instance
+The static Signature field was removed entirely. Instead, a new Signature instance is created locally inside the filter method for each request:
+
+
+// Before — one shared instance, not thread-safe
+private final static Signature signatureAlgorithm = Signature.getInstance(curve);
+
+// After — fresh instance per request, fully isolated
+var signatureAlgorithm = Signature.getInstance(curve); // inside filter()
+Each thread now has its own independent Signature object. There is no shared mutable state, and concurrent requests cannot interfere with each other's verification process. The instantiation cost is negligible.
+
+Fix 2 — ConcurrentHashMap for the Key Cache
+The HashMap was replaced with ConcurrentHashMap, the standard Java library's thread-safe alternative:
+
+
+// Before
+private final static Map<String, PublicKey> CACHE = new HashMap<>();
+
+// After
+private final static Map<String, PublicKey> CACHE = new ConcurrentHashMap<>();
+ConcurrentHashMap provides safe concurrent access without requiring explicit synchronization, making it the appropriate choice for a shared, application-scoped cache.
+
+7. Lessons Learned
+This bug illustrates a class of defects that is particularly insidious in server-side Java development:
+
+Static mutable state in a multi-threaded environment is a concurrency hazard. In a Jakarta EE / WildFly deployment, request-handling classes are instantiated once and reused across threads. Any static field holding a stateful, non-thread-safe object becomes a shared resource contended by all concurrent requests.
+
+The failure was especially difficult to detect because:
+
+It was non-deterministic — it only manifested when two requests arrived within the same millisecond
+It was not reproducible in isolation — sequential testing tools like Postman never triggered the race condition
+The symptom (null identity → 403) appeared in a completely different layer (the ABAC interceptor) from the actual cause (the authentication filter), making the stack trace misleading
+The debugging methodology that revealed the root cause was the combination of:
+
+Confirming the token was present (eliminating the frontend)
+Confirming the bug never reproduced under sequential load (pointing to concurrency)
+Reading timestamps in the server logs precisely (confirming two threads processed the same token simultaneously with divergent outcomes)

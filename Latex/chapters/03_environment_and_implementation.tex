@@ -37,6 +37,16 @@ ofc you can add content that you think is relevant but try to keep the same tone
 
 the first 2 week at canny vision were solely to understand the existing infrastructure
 I switched my os version from windows to linux to use wildfly effectively and set up the server
+talk about the stenghts of wildfly and how it's not your everyday server and how hard is it to set it up
+you can talk about how I spent 3 days trying to solve a problem where the server didn't allow cors request from the frontend to the api
+and how finally the problem was that the certficate used was created by sudo (sudo user) and when I set it up I used normal user
+->so there was a mix in the certfifs :
+You were using mkcert to secure your local environment (iam.localhost). Even though you successfully imported the certificates into the Oracle JDK cacerts file using keytool, your Java code continued to throw SSLHandshakeException.
+
+
+
+
+
 (please read /middleware/core/configs to understand more)
 even though I didn't develop myslef the IAM module, understanding it was not an easy task
 
@@ -55,4 +65,16 @@ after getting the grasp of how everything works
 I started to implement the api module which is the core of the system
 and which its architectuee has changed many times during the internship since we worked in agile/scrum 
 and kept on adding features and improving the design as we went along
+
+
+
+please talk about the folder strcuture of the middleware :
+how I used maven pom.xml to manage dependencies and build the project
+with three main modules : core, api and iam
+(read the folder middleware to understand more about the structure and the content of each module)
+talk about how core is the jar that contains all the common code and utilities that are shared between the api and iam modules
+and how the api module contains the business logic and the REST endpoints
+and how the iam module contains the authentication and authorization logic
+
+dear claude please take note that I am just throwing ideas ; and decide yourself the best order of the content
 
